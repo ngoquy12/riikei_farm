@@ -73,7 +73,7 @@ const server = http.createServer((req, res) => {
           .replace("{{description}}", fruit.description)
           .replace(
             "{{organic}}",
-            fruit.organic == false ? "organic" : " No oganic"
+            fruit.organic == true ? "organic" : " No oganic"
           );
       });
 
