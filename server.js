@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const url = require("url");
 const route = require("route");
+const { v4: uuidv4 } = require("uuid");
 
 const hostname = "127.0.0.1";
 const port = 3000;
@@ -97,7 +98,7 @@ const server = http.createServer((req, res) => {
     }
   } else if (req.url.startsWith("/product")) {
     // Lấy id trên đường dẫn thông qua phương thức split()
-    const productId = parseInt(req.url.split("/")[2]);
+    const productId = req.url.split("/")[2];
 
     // Lấy dữ liệu từ file data.json
     fs.readFile("./dev-data/data.json", "utf8", (err, data) => {
@@ -105,31 +106,29 @@ const server = http.createServer((req, res) => {
       if (err) throw err;
       // Ép kiểu từ dạng json sang kiểu js
       const fruits = JSON.parse(data);
-
       // Lấy ra phần tử của file product.html
       const productTemplate = fs
         .readFileSync("./templates/product.html")
         .toString();
+      // tìm kiếm
+      const findProduct = fruits.find((fruit) => fruit.id == productId);
 
-      const product = fruits.map((fruit) => {
-        return productTemplate
-          .replace("{{productName}}", fruit.productName)
-          .replace("{{from}}", fruit.from)
-          .replace("{{nutrients}}", fruit.nutrients)
-          .replace("{{quantity}}", fruit.quantity)
-          .replace(/{{price}}/g, fruit.price)
-          .replace(/{{image}}/g, fruit.image)
-          .replace("{{description}}", fruit.description)
-          .replace("{{id}}", fruit.id)
-          .replace(
-            "{{organic}}",
-            fruit.organic == true ? "organic" : " No oganic"
-          );
-      });
-
+      const product = productTemplate
+        .replace("{{productName}}", findProduct.productName)
+        .replace("{{from}}", findProduct.from)
+        .replace("{{nutrients}}", findProduct.nutrients)
+        .replace("{{quantity}}", findProduct.quantity)
+        .replace(/{{price}}/g, findProduct.price)
+        .replace(/{{image}}/g, findProduct.image)
+        .replace("{{description}}", findProduct.description)
+        .replace("{{id}}", findProduct.id)
+        .replace(
+          "{{organic}}",
+          findProduct.organic == true ? "organic" : " No oganic"
+        );
       res.statusCode = 200; // 200 OK
       res.setHeader("Content-Type", "text/html");
-      res.end(product[productId]);
+      res.end(product);
     });
   } else if (req.url === "/create") {
     /// Lấy ra phần tử của file create.html
@@ -147,48 +146,42 @@ const server = http.createServer((req, res) => {
           data += chunk.toString();
         })
         .on("end", () => {
-          let queryString = url.parse(`${route}?${data}`, true).query;
-          let newFruit = { ...queryString };
-          console.log("newFruit", newFruit);
+          const newId = uuidv4();
+          let queryString = url.parse(`${req.url}?${data}`, true).query;
+          let newFruit = { ...queryString, id: newId };
 
           // Đọc dữ liệu từ tệp data.json và gán vào mảng fruits
           let fruits = JSON.parse(
             fs.readFileSync("./dev-data/data.json", "utf8")
           );
 
-          function getRandomNumbers(count) {
-            while (fruits.length < count) {
-              const number = Math.floor(Math.random() * 100) + 1;
-              if (!fruits.includes(number)) {
-                fruits.push(number);
-              }
-            }
-            return fruits;
-          }
-
-          // Tạo một số ngẫu nhiên làm giá trị id
-          let id = getRandomNumbers(10);
-
-          // Thêm giá trị id vào đối tượng newFruit
-          newFruit.id = id;
           // Thêm dữ liệu mới vào mảng fruits
           fruits.push(newFruit);
 
           // Ghi lại mảng fruits vào tệp data.json
           fs.writeFileSync("./dev-data/data.json", JSON.stringify(fruits));
-          console.log("Chạy vào hàm thêm");
+          res.writeHead(302, { Location: "/" });
+          res.end();
         });
+    } else {
+      res.statusCode = 200; // 200 OK
+      res.setHeader("Content-Type", "text/html");
+      res.end(productTemplate);
     }
 
-    res.statusCode = 200; // 200 OK
-    res.setHeader("Content-Type", "text/html");
-    res.end(productTemplate);
+    // /delete/123
   } else if (req.url.startsWith("/delete")) {
     const id = req.url.split("/")[2];
-    console.log("id xóa: ", id);
+
+    // đọc fie data.json
     const fruits = JSON.parse(fs.readFileSync("./dev-data/data.json", "utf8"));
+    // lọc id được gửi lên trong db
+
     const newFruits = fruits.filter((fruit) => fruit.id != id);
+    // xóa dữ liệu theo id trong db
+
     fs.writeFileSync("./dev-data/data.json", JSON.stringify(newFruits));
+    // CHuyển hướng về trang home
     res.writeHead(302, { Location: "/" });
     res.end();
   } else {
